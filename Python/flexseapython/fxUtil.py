@@ -108,6 +108,43 @@ def printNetMaster(netMasterState: AllDevices.NetMasterState):
 	print('NetNode7 - accelx: ', netMasterState.H_accelx, ', accely: ', netMasterState.H_accely, ' accelz: ', netMasterState.H_accelz)
 	print('NetNode7 - gyrox:  ', netMasterState.H_gyrox,  ', gyroy:  ', netMasterState.H_gyroy,  ' gyroz:  ', netMasterState.H_gyroz)
 
+# Returns device data
+def getData(device, appType):
+	if (appType == FxActPack):
+		return formatData(fxReadDevice(device))
+	else:
+		raise RuntimeError('Unsupported application type: ', appType)
+
+def formatData(exoState: AllDevices.ExoState):
+	data = {
+	'state_time': exoState.state_time,
+	'accelx': exoState.accelx,
+	'accely': exoState.accely,
+	'accelz': exoState.accelz,
+	'gyrox': exoState.gyrox,
+	'gyroy': exoState.gyroy,
+	'gyroz': exoState.gyroz,
+	'mot_ang': exoState.mot_ang,
+	'mot_volt': exoState.mot_volt,
+	'mot_cur': exoState.mot_cur,
+	'batt_volt': exoState.batt_volt,
+	'batt_curr': exoState.batt_curr,
+	'temperature': exoState.temperature,
+	'genvar_0': exoState.genvar_0,
+	'genvar_1': exoState.genvar_1,
+	'genvar_2': exoState.genvar_2,
+	'genvar_3': exoState.genvar_3,
+	'genvar_4': exoState.genvar_4,
+	'genvar_5': exoState.genvar_5,
+	'genvar_6': exoState.genvar_6,
+	'genvar_7': exoState.genvar_7,
+	'genvar_8': exoState.genvar_8,
+	'genvar_9': exoState.genvar_9,
+	'ank_ang': exoState.ank_ang,
+	'ank_vel': exoState.ank_vel
+	}
+	return data
+
 # Most scripts will print a loop count:
 def printLoopCount(i, total):
 	print('\nLoop', i + 1, 'of', total)
