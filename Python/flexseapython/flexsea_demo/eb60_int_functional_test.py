@@ -18,12 +18,14 @@ def fxEB60IntFunctTest(port, baudRate, time = 2, num_times = 5,
 	testFlag = True
 	if testFlag:
 		testFlag = eb60SensorCheck(devId, appType, time=2, time_step=0.1)
+	"""
 	if testFlag:
-		testFlag = eb60AnkCheck(devId, appType, time=5, time_step=0.1)
+		testFlag = eb60AnkCheck(devId, appType, time=2, time_step=0.1)
 	if testFlag:
-		testFlag = eb60FindPoles()
+		testFlag = eb60FindPoles(devId)
+	"""
 	if testFlag:
-		testFlag = eb60NoLoadAct()
+		testFlag = eb60NoLoadAct(devId, appType, time=10, time_step=0.1, mV=1000, motVelRange=[0, 1000])
 	if testFlag:
 		testFlag = eb60IMUCal()
 
@@ -42,26 +44,13 @@ def fxEB60IntFunctTest(port, baudRate, time = 2, num_times = 5,
 def eb60SensorCheck(devId, appType, time, time_step):
 	print("\nChecking Sensors...")
 
-	# Build dataDict for sensor data
-	dataDict = {}
-	data = getData(devId, appType)
-	for d in data:
-		dataDict[d] = []
-
-	# Record data for time
-	totalLoopCount = int(time / time_step)
-	for i in range(totalLoopCount):
-		print(f'Sensor Check Measurement {i} of {totalLoopCount}')
-		sleep(time_step)
-		data = getData(devId, appType)
-		for d in data:
-			dataDict[d].append(data[d])
+	dataDict = recordData(devId, appType, time, time_step, showMsg=True)
 
 	if checkSensVals(dataDict):
-		print("Sensor Check Passed")
+		print("\nSensor Check Passed")
 		return True
 	else:
-		print("Test Failed: Sensor Check Failed")
+		print("\nTest Failed: Sensor Check Failed")
 		return False
 
 def checkSensVals(dataDict):
@@ -84,9 +73,10 @@ def checkSensVals(dataDict):
 		'gyrox': {'min': -15000, 'max': 15000},
 		'gyroy': {'min': -15000, 'max': 15000},
 		'gyroz': {'min': -15000, 'max': 15000},
-		'batt_volt': {'min': 180, 'max': 225},
-		'batt_curr': {'min': -130, 'max': 120},
-		'temperature': {'min': 10, 'max': 40},
+		#'batt_volt': {'min': 180, 'max': 225},		# USB Voltage
+		'batt_volt': {'min': 38000, 'max': 39000},	# Power Supply Voltage
+		'batt_curr': {'min': -130, 'max': 228},
+		'temperature': {'min': 10, 'max': 53},
 		'ank_ang': {'min': 2000, 'max': 6300},
 		'ank_vel': {'min': -500, 'max': 500}
 		}
@@ -97,7 +87,7 @@ def checkSensVals(dataDict):
 			print(f"\nSensor Check Failed: {sensor} minimum is {sensorMin} (it should be above {sensorRange[sensor]['min']})")
 			testPassed = False
 		if sensorMax > sensorRange[sensor]['max']:
-			print(f"\nSensor Check Failed: {sensor} maximum is {sensorMax} (it should be above {sensorRange[sensor]['max']})")
+			print(f"\nSensor Check Failed: {sensor} maximum is {sensorMax} (it should be below {sensorRange[sensor]['max']})")
 			testPassed = False	
 
 	return testPassed
@@ -107,26 +97,14 @@ def eb60AnkCheck(devId, appType, time, time_step):
 	print('\n>>> User Input: Move ankle through its full range of travel for 5 seconds\n')
 	sleep(3)
 
-	# Build dataDict for sensor data
-	dataDict = {}
-	data = getData(devId, appType)
-	for d in data:
-		dataDict[d] = []
-
-	# Record data for time
-	totalLoopCount = int(time / time_step)
-	for i in range(totalLoopCount):
-		print(f'Ankle Angle Check Measurement {i} of {totalLoopCount}')
-		sleep(time_step)
-		data = getData(devId, appType)
-		for d in data:
-			dataDict[d].append(data[d])
+	print('Measuring Ankle Position...')
+	dataDict = recordData(devId, appType, time, time_step, showMsg=True)
 
 	if checkAnkVals(dataDict):
-		print("Ankle Angle Check Passed")
+		print("\nAnkle Angle Check Passed")
 		return True
 	else:
-		print("Test Failed: Ankle Angle Check Failed")
+		print("\nTest Failed: Ankle Angle Check Failed")
 		return False		
 
 def checkAnkVals(dataDict):
@@ -135,7 +113,7 @@ def checkAnkVals(dataDict):
 
 	sensors = ['ank_ang']
 	sensorRange = {
-		'ank_ang': {'min_lo': 1990, 'min_hi': 2100, 'max_lo': 6200, 'max_hi': 6400},
+		'ank_ang': {'min_lo': 1990, 'min_hi': 2100, 'max_lo': 6150, 'max_hi': 6400},
 		}
 	for sensor in sensors:
 		sensorMin = min(dataDict[sensor])
@@ -151,21 +129,96 @@ def checkAnkVals(dataDict):
 
 
 #####################################################################
-def eb60FindPoles():
+def eb60FindPoles(devId):
 	print("\nFinding Poles...")
-
-	print("Poles Found")
+	fxFindPoles(devId)
+	time = 60.0
+	time_step = 10.0
+	for i in range(int(time / time_step)):
+		print(f"{time - i * time_step} seconds remaining")
+		sleep(time_step)
+	print(f"{time - i * time_step} seconds remaining")
 	return True
 
-def eb60NoLoadAct():
-	print("\nNo Load Test Passed")
-	return True
+def eb60NoLoadAct(devId, appType, time, time_step, mV, motVelRange):
+	print("\nRunning No Load Test...")
+	testPassed = True
+	fxSendMotorCommand(devId, FxVoltage, 0)
+	sleep(1)
+	try:
+		# Measure cogging voltage
+		[time, time_step] = [30, 0.1]
+		[mV, mVmax] = [0, 2000]
+		mot_vel = 0
+		dataDict = getData(devId, appType)
+		mot_ang = dataDict['mot_ang']
+		last_mot_ang = mot_ang
+		[cogFlag, mVcog] = [True, -1]
+
+		# Ramp up
+		for i in range(int(time / time_step)):
+			if (i * time_step) % 1 == 0:
+				print(f"{int(time - i * time_step)} seconds remaining")
+			dataDict = getData(devId, appType)
+			mot_ang = dataDict['mot_ang']
+			mot_vel = (mot_ang - last_mot_ang)/time_step
+			sleep(time_step)
+			mV = int(mV + mVmax / (time / time_step))
+			fxSendMotorCommand(devId, FxVoltage, mV)
+			if mot_vel > 1000 and cogFlag:
+				cogFlag = False
+				mVcog = mV
+
+			last_mot_ang = mot_ang
+		print("0 seconds")
+
+		# Let motor reach steady state and measure speed
+		print("\nMeasuring no load speed...")
+		sleep(1)
+		dataDict = recordData(devId, appType, time=3, time_step=0.1, showMsg=True)
+		motVelList = []
+		last_mot_ang = 0
+		for ang in dataDict['mot_ang']:
+			motVelList.append(ang - last_mot_ang)
+		noLoadVel = mean(motVelList)
+		motVelList.pop(0)
+		noLoadVel = mean(motVelList)
+
+		# Ramp down
+		[time, time_step] = [2, .01]
+		for i in range(int(time / time_step)):
+			sleep(time_step)
+			mV = int(mV - mVmax / (time / time_step))
+			fxSendMotorCommand(devId, FxVoltage, mV)
+		fxSendMotorCommand(devId, FxVoltage, 0)
+
+		print(f"\nMotor cogging voltage: {int(mVcog)} mv    Motor no load speed at {mVmax} mv: {int(noLoadVel)}")
+
+		[mVcogLim, noLoadVelLim] = [766, 8200000]
+		if mVcog > mVcogLim:
+			print(f"\nNo Load Test Failed. Measured cogging voltage was {mVcog}, it should be be {mVcogLim}")
+			testPassed = False
+		if noLoadVel < noLoadVelLim:
+			print(f"\nNo Load Test Failed. Measured no load velocity was {noLoadVel}, it should be above {noLoadVelLim}")
+			testPassed = False
+
+		return testPassed
+
+	except:
+		print("\nError: problem in no load test")
+		fxSendMotorCommand(devId, FxVoltage, 0)
+		testPassed = False
+		return testPassed
+
 
 def eb60IMUCal():
 	print("\nPerfoming IMU Calibration...")
 
 	print("IMU Calibration Successful")
 	return True
+
+
+
 
 
 
