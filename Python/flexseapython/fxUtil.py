@@ -145,6 +145,26 @@ def formatData(exoState: AllDevices.ExoState):
 	}
 	return data
 
+# Record data and return a dictionary of values
+def recordData(devId, appType, time, time_step, showMsg):
+	# Build dataDict for sensor data
+	dataDict = {}
+	data = getData(devId, appType)
+	for d in data:
+		dataDict[d] = []
+
+	# Record data for time
+	totalLoopCount = int(time / time_step)
+	for i in range(totalLoopCount):
+		if showMsg:
+			print(f'Measurement {i+1} of {totalLoopCount}')
+		sleep(time_step)
+		data = getData(devId, appType)
+		for d in data:
+			dataDict[d].append(data[d])
+
+	return dataDict
+
 # Most scripts will print a loop count:
 def printLoopCount(i, total):
 	print('\nLoop', i + 1, 'of', total)
