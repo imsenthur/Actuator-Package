@@ -6,8 +6,7 @@ from numpy import mean
 pardir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(pardir)
 
-def fxEB60IntFunctTest(port, baudRate, time = 2, num_times = 5,
-		time_resolution = 0.1, maxVoltage = 3000, sign = -1):
+def fxEB60IntFunctTest(port, baudRate):
 	# Setup Device
 	devId = fxOpen(port, baudRate, logLevel = 6)
 	fxStartStreaming(devId, 100, shouldLog = True)
@@ -18,18 +17,12 @@ def fxEB60IntFunctTest(port, baudRate, time = 2, num_times = 5,
 	testFlag = True
 	if testFlag:
 		testFlag = eb60SensorCheck(devId, appType, time=2, time_step=0.1)
-	"""
 	if testFlag:
 		testFlag = eb60AnkCheck(devId, appType, time=2, time_step=0.1)
+	#if testFlag:
+	#	testFlag = eb60FindPoles(devId)
 	if testFlag:
-		testFlag = eb60FindPoles(devId)
-	"""
-	if testFlag:
-		testFlag = eb60NoLoadAct(devId, appType, time=10, time_step=0.1, mV=1000, motVelRange=[0, 1000])
-	if testFlag:
-		testFlag = eb60IMUCal()
-
-
+		testFlag = eb60NoLoadAct(devId, appType, time=10, time_step=0.1)
 	if testFlag:
 		print("\nAll Tests Passed")
 
@@ -55,9 +48,9 @@ def eb60SensorCheck(devId, appType, time, time_step):
 
 def checkSensVals(dataDict):
 	testPassed = True
-
 	# Check sensor are non zero
-	sensors = ['accelx', 'accely', 'accelz', 'gyrox', 'gyroy', 'gyroz', 'mot_ang', 'mot_cur', 'batt_volt', 'batt_curr']
+	sensors = ['accelx', 'accely', 'accelz', 'gyrox', 'gyroy', 'gyroz', 
+				'mot_ang', 'mot_cur', 'batt_volt', 'batt_curr']
 	for sensor in sensors:
 		sensorMean = mean(dataDict[sensor])
 		if sensorMean == 0.0:
@@ -65,7 +58,8 @@ def checkSensVals(dataDict):
 			testPassed = False
 
 	# Check sensors are in range
-	sensors = ['accelx', 'accely', 'accelz', 'gyrox', 'gyroy', 'gyroz', 'batt_volt', 'batt_curr', 'temperature']
+	sensors = ['accelx', 'accely', 'accelz', 'gyrox', 'gyroy', 'gyroz', 
+				'batt_volt', 'batt_curr', 'temperature']
 	sensorRange = {
 		'accelx': {'min': -25000, 'max': 25000},
 		'accely': {'min': -25000, 'max': 25000},
@@ -127,20 +121,18 @@ def checkAnkVals(dataDict):
 
 	return testPassed
 
-
-#####################################################################
 def eb60FindPoles(devId):
 	print("\nFinding Poles...")
 	fxFindPoles(devId)
 	time = 60.0
 	time_step = 10.0
 	for i in range(int(time / time_step)):
-		print(f"{time - i * time_step} seconds remaining")
+		print(f"{int(time - i * time_step)} seconds remaining")
 		sleep(time_step)
-	print(f"{time - i * time_step} seconds remaining")
+	print("0 seconds remaining")
 	return True
 
-def eb60NoLoadAct(devId, appType, time, time_step, mV, motVelRange):
+def eb60NoLoadAct(devId, appType, time, time_step):
 	print("\nRunning No Load Test...")
 	testPassed = True
 	fxSendMotorCommand(devId, FxVoltage, 0)
@@ -163,14 +155,14 @@ def eb60NoLoadAct(devId, appType, time, time_step, mV, motVelRange):
 			mot_ang = dataDict['mot_ang']
 			mot_vel = (mot_ang - last_mot_ang)/time_step
 			sleep(time_step)
-			mV = int(mV + mVmax / (time / time_step))
+			mV = int(mVmax * ((i + 1) * time_step/time))
+			print(i, mV)
 			fxSendMotorCommand(devId, FxVoltage, mV)
 			if mot_vel > 1000 and cogFlag:
 				cogFlag = False
 				mVcog = mV
-
 			last_mot_ang = mot_ang
-		print("0 seconds")
+		print("0 seconds remaining")
 
 		# Let motor reach steady state and measure speed
 		print("\nMeasuring no load speed...")
@@ -194,7 +186,7 @@ def eb60NoLoadAct(devId, appType, time, time_step, mV, motVelRange):
 
 		print(f"\nMotor cogging voltage: {int(mVcog)} mv    Motor no load speed at {mVmax} mv: {int(noLoadVel)}")
 
-		[mVcogLim, noLoadVelLim] = [766, 8200000]
+		[mVcogLim, noLoadVelLim] = [766, 520000]
 		if mVcog > mVcogLim:
 			print(f"\nNo Load Test Failed. Measured cogging voltage was {mVcog}, it should be be {mVcogLim}")
 			testPassed = False
@@ -206,22 +198,10 @@ def eb60NoLoadAct(devId, appType, time, time_step, mV, motVelRange):
 
 	except:
 		print("\nError: problem in no load test")
+		# Set motor voltage to 0 if error occurs
 		fxSendMotorCommand(devId, FxVoltage, 0)
 		testPassed = False
 		return testPassed
-
-
-def eb60IMUCal():
-	print("\nPerfoming IMU Calibration...")
-
-	print("IMU Calibration Successful")
-	return True
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
