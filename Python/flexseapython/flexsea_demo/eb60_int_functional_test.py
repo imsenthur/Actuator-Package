@@ -191,9 +191,8 @@ def eb60NoLoadAct(devId, appType, logFile):
 		print('\n' + text)
 		logFile.write(text)
 		text = f"Motor no load speed at {mVmax} mv: {int(noLoadVel)}    Acceptance criteria > {noLoadVelLim}"
-		print('\n' + text)
+		print(text)
 		logFile.write(text)
-
 
 		# Check if test passed
 		if mVcog > mVcogLim:
@@ -213,7 +212,7 @@ def eb60NoLoadAct(devId, appType, logFile):
 	except Exception as e:
 		# Set motor voltage to 0 if error occurs
 		fxSendMotorCommand(devId, FxVoltage, 0)
-		text = "Error: problem in no load test - " + e
+		text = "Error: problem in no load test - " + str(e)
 		print('\n' + text)
 		logFile.write(text)
 		testPassed = False
@@ -267,42 +266,6 @@ def noLoadRampDown(devId, appType, time, time_step, mV_start):
 			fxSendMotorCommand(devId, FxVoltage, mV)
 		fxSendMotorCommand(devId, FxVoltage, 0)
 
-# Object used to log test data
-class TestLogFile:
-	def __init__(self, testname):
-		print('\n>>>Input device serial number:')
-		sn = input() 
-		print('>>>Enter your initials:')
-		operator = input()
-		now = datetime.datetime.now()
-		date = now.strftime("%Y%m%d")
-		time = now.strftime("%H%M%S")
-		nowstr = date + "_" + time
-
-		curDir = os.getcwd()
-		self.logDir = os.getcwd() + '/TestLog'
-		if not os.path.exists(self.logDir):
-			os.makedirs(self.logDir)
-		os.chdir(self.logDir)
-
-		self.filename = nowstr + "_SN" + sn + "_" + testname
-		f = open(self.filename, "a")
-		f.write(f"Test: {testname}")
-		f.write(f"\nSN: {sn}")
-		f.write(f"\nDate: {date}")
-		f.write(f"\nStart Time: {time}")
-		f.write(f"\nOperator: {operator}")
-		f.close()
-		os.chdir(curDir)
-
-	def write(self, text):
-		curDir = os.getcwd()
-		os.chdir(self.logDir)
-		f = open(self.filename, "a")
-		f.write(f"\n{datetime.datetime.now()}: ")
-		f.write(text)
-		f.close
-		os.chdir(curDir)
 
 
 if __name__ == '__main__':
