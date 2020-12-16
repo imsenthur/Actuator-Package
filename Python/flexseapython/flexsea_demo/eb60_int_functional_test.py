@@ -2,6 +2,7 @@ import os, sys
 from time import sleep
 from flexseapython.fxUtil import *
 from numpy import mean
+import datetime
 
 pardir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(pardir)
@@ -13,24 +14,26 @@ def fxEB60IntFunctTest(port, baudRate):
 	appType = fxGetAppType(devId)
 
 	print("\nStarting Intermediate Functional Test...")
-	#file1 = open("MyFile.txt","a") 
 
+	logFile = TestLogFile('EB60_Intermediate_Functional_Test')
 
 	testFlag = True
 	if testFlag:
-		testFlag = eb60SensorCheck(devId, appType)
+		testFlag = eb60SensorCheck(devId, appType, logFile)
 	if testFlag:
-		testFlag = eb60AnkCheck(devId, appType)
+		testFlag = eb60AnkCheck(devId, appType, logFile)
 	if testFlag:
-		testFlag = eb60FindPoles(devId)
+		testFlag = eb60FindPoles(devId, logFile)
 		# Close the reopen device
 		fxClose(devId)
 		devId = fxOpen(port, baudRate, logLevel = 6)
 		fxStartStreaming(devId, 100, shouldLog = True)
 	if testFlag:
-		testFlag = eb60NoLoadAct(devId, appType)
+		testFlag = eb60NoLoadAct(devId, appType, logFile)
 	if testFlag:
 		print("\nAll Tests Passed")
+		logFile.write("All tests passed")
+
 
 
 	# Close device
@@ -42,17 +45,22 @@ def fxEB60IntFunctTest(port, baudRate):
 # Test Functions
 
 # Sensor Check - Verify all sensors are functioning nominally
-def eb60SensorCheck(devId, appType):
+def eb60SensorCheck(devId, appType, logFile):
 	print("\nChecking Sensors...")
+	logFile.write(f'Sensor check start')
 	[time, time_step] = [2, 0.1]
 
 	dataDict = recordData(devId, appType, time, time_step, showMsg=True)
 
 	if checkSensVals(dataDict):
 		print("\nSensor Check Passed")
+		logFile.write(f'Sensor check end')
+		logFile.write('Sensor Check Passed')
 		return True
 	else:
 		print("\nTest Failed: Sensor Check Failed")
+		logFile.write(f'Sensor check end')
+		logFile.write('Sensor Check Failed')
 		return False
 
 def checkSensVals(dataDict):
@@ -78,7 +86,7 @@ def checkSensVals(dataDict):
 		'gyroz': {'min': -15000, 'max': 15000},
 		#'batt_volt': {'min': 180, 'max': 225},		# USB Voltage
 		'batt_volt': {'min': 38000, 'max': 39000},	# Power Supply Voltage
-		'batt_curr': {'min': -130, 'max': 228},
+		'batt_curr': {'min': -130, 'max': 231},
 		'temperature': {'min': 10, 'max': 60},
 		'ank_ang': {'min': 2000, 'max': 6300},
 		'ank_vel': {'min': -500, 'max': 500}
@@ -96,7 +104,8 @@ def checkSensVals(dataDict):
 	return testPassed
 
 # Ankle Encoder Check - Verfiy ankle encoder is functioning nominally
-def eb60AnkCheck(devId, appType):
+def eb60AnkCheck(devId, appType, logFile):
+	logFile.write(f'Ankle angle check start')
 	[time, time_step] = [5, 0.1]
 
 	print(f'\n>>> User Input: Move ankle through its full range of travel for {time} seconds\n')
@@ -104,14 +113,18 @@ def eb60AnkCheck(devId, appType):
 	print('Measuring Ankle Position...')
 	dataDict = recordData(devId, appType, time, time_step, showMsg=True, msgFreq=5)
 
-	if checkAnkVals(dataDict):
+	if checkAnkVals(dataDict, logFile):
 		print("\nAnkle Angle Check Passed")
+		logFile.write('Ankle Angle Check Passed')
+		logFile.write(f'Ankle angle check end')
 		return True
 	else:
 		print("\nTest Failed: Ankle Angle Check Failed")
+		logFile.write('Ankle Angle Check Failed')
+		logFile.write(f'Ankle angle check end')
 		return False		
 
-def checkAnkVals(dataDict):
+def checkAnkVals(dataDict, logFile):
 	# Check that sensors min and max are in range
 	testPassed = True
 
@@ -124,16 +137,21 @@ def checkAnkVals(dataDict):
 		sensorMin = min(dataDict[sensor])
 		sensorMax = max(dataDict[sensor])
 		if sensorMin < sensorRange[sensor]['min_lo'] or sensorMin > sensorRange[sensor]['min_hi']:
-			print(f"\nSensor Check Failed: {sensor} minimum is {sensorMin} (it should be between {sensorRange[sensor]['min_lo']} and {sensorRange[sensor]['min_hi']})")
+			text = f"\nSensor Check Failed: {sensor} minimum is {sensorMin} (it should be between {sensorRange[sensor]['min_lo']} and {sensorRange[sensor]['min_hi']})"
+			print(text)
+			logFile.write(text)
 			testPassed = False
 		if sensorMax < sensorRange[sensor]['max_lo'] or sensorMax > sensorRange[sensor]['max_hi']:
-			print(f"\nSensor Check Failed: {sensor} maximum is {sensorMax} (it should be between {sensorRange[sensor]['max_lo']} and {sensorRange[sensor]['max_hi']})")
+			text = f"\nSensor Check Failed: {sensor} maximum is {sensorMax} (it should be between {sensorRange[sensor]['max_lo']} and {sensorRange[sensor]['max_hi']})"
+			print(text)
+			logFile.write(text)
 			testPassed = False
 
 	return testPassed
 
-def eb60FindPoles(devId):
+def eb60FindPoles(devId, logFile):
 	print("\nFinding Poles...")
+	logFile.write(f'Find poles start')
 	time = 60.0
 	time_step = 10.0
 	
@@ -142,10 +160,12 @@ def eb60FindPoles(devId):
 		print(f"{int(time - i * time_step)} seconds remaining")
 		sleep(time_step)
 	print("0 seconds remaining")
+	logFile.write(f'Find poles end')
 	return True
 
-def eb60NoLoadAct(devId, appType):
+def eb60NoLoadAct(devId, appType, logFile):
 	print("\nRunning No Load Test...")
+	logFile.write(f'No load test start')
 	# Test parameters
 	[rampUpTime, rampUpTimeStep, mVmax] = [30, 0.1, 2000]
 	[noLoadTime, noLoadTimeStep] = [5, 0.1]
@@ -170,17 +190,25 @@ def eb60NoLoadAct(devId, appType):
 
 		# Check if test passed
 		if mVcog > mVcogLim:
-			print(f"\nNo Load Test Failed. Measured cogging voltage was {int(mVcog)}, it should be be {mVcogLim}")
+			text = f"No Load Test Failed. Measured cogging voltage was {int(mVcog)}, it should be be {mVcogLim}"
+			print('\n' + text)
+			logFile.write(text)
 			testPassed = False
 		if noLoadVel < noLoadVelLim:
-			print(f"\nNo Load Test Failed. Measured no load velocity was {int(noLoadVel)}, it should be above {noLoadVelLim}")
+			text = f"No Load Test Failed. Measured no load velocity was {int(noLoadVel)}, it should be above {noLoadVelLim}"
+			print('\n' + text)
+			logFile.write(text)
 			testPassed = False
+
+		logFile.write(f'No load test end')
 		return testPassed
 
 	except:
 		# Set motor voltage to 0 if error occurs
 		fxSendMotorCommand(devId, FxVoltage, 0)
-		print("\nError: problem in no load test")
+		text = "Error: problem in no load test"
+		print('\n' + text)
+		logFile.write(text)
 		testPassed = False
 		return testPassed
 
@@ -231,6 +259,43 @@ def noLoadRampDown(devId, appType, time, time_step, mV_start):
 			mV = int(mV - mV_start / (time / time_step))
 			fxSendMotorCommand(devId, FxVoltage, mV)
 		fxSendMotorCommand(devId, FxVoltage, 0)
+
+# Object used to log test data
+class TestLogFile:
+	def __init__(self, testname):
+		print('\n>>>Input device serial number:')
+		sn = input() 
+		print('>>>Enter your initials:')
+		operator = input()
+		now = datetime.datetime.now()
+		date = now.strftime("%Y%m%d")
+		time = now.strftime("%H%M%S")
+		nowstr = date + "_" + time
+
+		curDir = os.getcwd()
+		self.logDir = os.getcwd() + '/TestLog'
+		if not os.path.exists(self.logDir):
+			os.makedirs(self.logDir)
+		os.chdir(self.logDir)
+
+		self.filename = nowstr + "_SN" + sn + "_" + testname
+		f = open(self.filename, "a")
+		f.write(f"Test: {testname}")
+		f.write(f"\nSN: {sn}")
+		f.write(f"\nDate: {date}")
+		f.write(f"\nStart Time: {time}")
+		f.write(f"\nOperator: {operator}")
+		f.close()
+		os.chdir(curDir)
+
+	def write(self, text):
+		curDir = os.getcwd()
+		os.chdir(self.logDir)
+		f = open(self.filename, "a")
+		f.write(f"\n{datetime.datetime.now()}: ")
+		f.write(text)
+		f.close
+		os.chdir(curDir)
 
 
 if __name__ == '__main__':
