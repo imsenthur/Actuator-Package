@@ -52,7 +52,7 @@ def eb60SensorCheck(devId, appType, logFile):
 
 	dataDict = recordData(devId, appType, time, time_step, showMsg=True)
 
-	if checkSensVals(dataDict):
+	if checkSensVals(dataDict, logFile):
 		print("\nSensor Check Passed")
 		logFile.write(f'Sensor check end')
 		logFile.write('Sensor Check Passed')
@@ -63,13 +63,14 @@ def eb60SensorCheck(devId, appType, logFile):
 		logFile.write('Sensor Check Failed')
 		return False
 
-def checkSensVals(dataDict):
+def checkSensVals(dataDict, logFile):
 	testPassed = True
 	# Check sensor are non zero
 	sensors = ['accelx', 'accely', 'accelz', 'gyrox', 'gyroy', 'gyroz', 
 				'mot_ang', 'mot_cur', 'batt_volt', 'batt_curr']
 	for sensor in sensors:
 		sensorMean = mean(dataDict[sensor])
+		logFile.write(f'sensor = {sensor}, measured mean = {str(sensorMean)}, Acceptance criteria - not == 0.0')
 		if sensorMean == 0.0:
 			print(f'Sensor Check Failed: {sensor} is 0.0')
 			testPassed = False
@@ -94,6 +95,7 @@ def checkSensVals(dataDict):
 	for sensor in sensors:
 		sensorMin = min(dataDict[sensor])
 		sensorMax = max(dataDict[sensor])
+		logFile.write(f"sensor = {sensor}, measured [minimum, maximum] = [{str(sensorMin)}, {str(sensorMax)}], limit [minimum, maximum] = [{str(sensorRange[sensor]['min'])}, {str(sensorRange[sensor]['max'])}]")
 		if sensorMin < sensorRange[sensor]['min']:
 			print(f"\nSensor Check Failed: {sensor} minimum is {sensorMin} (it should be above {sensorRange[sensor]['min']})")
 			testPassed = False
@@ -136,6 +138,8 @@ def checkAnkVals(dataDict, logFile):
 	for sensor in sensors:
 		sensorMin = min(dataDict[sensor])
 		sensorMax = max(dataDict[sensor])
+		logFile.write(f"sensor = {sensor}, measured minimum = {str(sensorMin)}, acceptable range = {str(sensorRange[sensor]['min_lo'])} to {str(sensorRange[sensor]['min_hi'])}")
+		logFile.write(f"sensor = {sensor}, measured minimum = {str(sensorMax)}, acceptable range = {str(sensorRange[sensor]['max_lo'])} to {str(sensorRange[sensor]['max_hi'])}")
 		if sensorMin < sensorRange[sensor]['min_lo'] or sensorMin > sensorRange[sensor]['min_hi']:
 			text = f"\nSensor Check Failed: {sensor} minimum is {sensorMin} (it should be between {sensorRange[sensor]['min_lo']} and {sensorRange[sensor]['min_hi']})"
 			print(text)
@@ -179,14 +183,17 @@ def eb60NoLoadAct(devId, appType, logFile):
 	try:
 		# Ramp motor up and measure voltage to overcome friction
 		mVcog = noLoadRampUp(devId, appType, rampUpTime, rampUpTimeStep, mVmax)
-
 		# Let motor reach steady state and measure speed
 		noLoadVel = measureNoLoadSpeed(devId, appType, noLoadTime, noLoadTimeStep, mVmax)
-
-		# Ramp down
 		noLoadRampDown(devId, appType, rampDownTime, rampDownTimeStep, mVmax)
 
-		print(f"\nMotor cogging voltage: {int(mVcog)} mv    Motor no load speed at {mVmax} mv: {int(noLoadVel)}")
+		text = f"Motor cogging voltage: {int(mVcog)} mv    Acceptance criteria < {mVcogLim}"
+		print('\n' + text)
+		logFile.write(text)
+		text = f"Motor no load speed at {mVmax} mv: {int(noLoadVel)}    Acceptance criteria > {noLoadVelLim}"
+		print('\n' + text)
+		logFile.write(text)
+
 
 		# Check if test passed
 		if mVcog > mVcogLim:
@@ -203,10 +210,10 @@ def eb60NoLoadAct(devId, appType, logFile):
 		logFile.write(f'No load test end')
 		return testPassed
 
-	except:
+	except Exception as e:
 		# Set motor voltage to 0 if error occurs
 		fxSendMotorCommand(devId, FxVoltage, 0)
-		text = "Error: problem in no load test"
+		text = "Error: problem in no load test - " + e
 		print('\n' + text)
 		logFile.write(text)
 		testPassed = False
