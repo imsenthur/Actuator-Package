@@ -34,12 +34,9 @@ def fxEB60IntFunctTest(port, baudRate):
 		print("\nAll Tests Passed")
 		logFile.write("All tests passed")
 
-
-
 	# Close device
 	fxClose(devId)
 	return True
-
 
 ##########################################################################
 # Test Functions
