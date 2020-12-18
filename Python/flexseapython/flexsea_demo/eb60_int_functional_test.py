@@ -1,53 +1,57 @@
 import os, sys
 from time import sleep
-from flexseapython.fxUtil import *
+import flexseapython.fxUtil as fxu
+import flexseapython.pyFlexsea as fxp
+import testLogFile as tlf
 from numpy import mean
-import datetime
 
-pardir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(pardir)
+PARDIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(PARDIR)
 
 def fxEB60IntFunctTest(port, baudRate):
+	"""
+	Runs intermediate functional test designed for EB60
+	"""
 	# Setup Device
-	devId = fxOpen(port, baudRate, logLevel = 6)
-	fxStartStreaming(devId, 100, shouldLog = True)
-	appType = fxGetAppType(devId)
+	devId = fxp.fxOpen(port, baudRate, logLevel = 6)
+	fxp.fxStartStreaming(devId, 100, shouldLog = True)
+	appType = fxp.fxGetAppType(devId)
 
 	print("\nStarting Intermediate Functional Test...")
 
-	logFile = TestLogFile('EB60_Intermediate_Functional_Test')
+	logFile = tlf.TestLogFile('EB60_Intermediate_Functional_Test')
 
-	testFlag = True
-	if testFlag:
-		testFlag = eb60SensorCheck(devId, appType, logFile)
-	if testFlag:
-		testFlag = eb60AnkCheck(devId, appType, logFile)
-	if testFlag:
-		testFlag = eb60FindPoles(devId, logFile)
-		# Close the reopen device
-		fxClose(devId)
-		devId = fxOpen(port, baudRate, logLevel = 6)
-		fxStartStreaming(devId, 100, shouldLog = True)
-	if testFlag:
-		testFlag = eb60NoLoadAct(devId, appType, logFile)
-	if testFlag:
+	# Run tests
+	try:
+		assert eb60SensorCheck(devId, appType, logFile), 'Sensor Check Failed'
+		assert eb60AnkCheck(devId, appType, logFile), 'Ankle Check Failed'
+		assert eb60FindPoles(devId, logFile), 'Find Poles Failed'
+		# Close the reopen device after finding poles
+		fxp.fxClose(devId)
+		devId = fxp.fxOpen(port, baudRate, logLevel = 6)
+		fxp.fxStartStreaming(devId, 100, shouldLog = True)
+		assert eb60NoLoadAct(devId, appType, logFile), 'No Load Test Failed'
 		print("\nAll Tests Passed")
 		logFile.write("All tests passed")
+	except AssertionError as err:
+		print('Test Failed: {}'.format(err))
 
 	# Close device
-	fxClose(devId)
+	fxp.fxClose(devId)
 	return True
 
 ##########################################################################
 # Test Functions
 
-# Sensor Check - Verify all sensors are functioning nominally
 def eb60SensorCheck(devId, appType, logFile):
+	"""
+	Sensor Check - Verify all sensors are functioning nominally
+	"""
 	print("\nChecking Sensors...")
 	logFile.write(f'Sensor check start')
 	[time, time_step] = [2, 0.1]
 
-	dataDict = recordData(devId, appType, time, time_step, showMsg=True)
+	dataDict = fxu.recordData(devId, appType, time, time_step, showMsg=True)
 
 	if checkSensVals(dataDict, logFile):
 		print("\nSensor Check Passed")
@@ -55,12 +59,17 @@ def eb60SensorCheck(devId, appType, logFile):
 		logFile.write('Sensor Check Passed')
 		return True
 	else:
-		print("\nTest Failed: Sensor Check Failed")
 		logFile.write(f'Sensor check end')
 		logFile.write('Sensor Check Failed')
 		return False
 
 def checkSensVals(dataDict, logFile):
+	"""
+	Verify that measured sensor values match expect values.
+	Checks include:
+	  - signals are non zero
+	  - signals are in expected range
+	 """
 	testPassed = True
 	# Check sensor are non zero
 	sensors = ['accelx', 'accely', 'accelz', 'gyrox', 'gyroy', 'gyroz', 
@@ -73,8 +82,6 @@ def checkSensVals(dataDict, logFile):
 			testPassed = False
 
 	# Check sensors are in range
-	sensors = ['accelx', 'accely', 'accelz', 'gyrox', 'gyroy', 'gyroz', 
-				'batt_volt', 'batt_curr', 'temperature']
 	sensorRange = {
 		'accelx': {'min': -25000, 'max': 25000},
 		'accely': {'min': -25000, 'max': 25000},
@@ -85,11 +92,11 @@ def checkSensVals(dataDict, logFile):
 		#'batt_volt': {'min': 180, 'max': 225},		# USB Voltage
 		'batt_volt': {'min': 38000, 'max': 39000},	# Power Supply Voltage
 		'batt_curr': {'min': -130, 'max': 231},
-		'temperature': {'min': 10, 'max': 60},
-		'ank_ang': {'min': 2000, 'max': 6300},
-		'ank_vel': {'min': -500, 'max': 500}
+		'temperature': {'min': 10, 'max': 60}
+		#'ank_ang': {'min': 2000, 'max': 6300},
+		#'ank_vel': {'min': -500, 'max': 500}
 		}
-	for sensor in sensors:
+	for sensor in sensorRange:
 		sensorMin = min(dataDict[sensor])
 		sensorMax = max(dataDict[sensor])
 		logFile.write(f"sensor = {sensor}, measured [minimum, maximum] = [{str(sensorMin)}, {str(sensorMax)}], limit [minimum, maximum] = [{str(sensorRange[sensor]['min'])}, {str(sensorRange[sensor]['max'])}]")
@@ -102,15 +109,21 @@ def checkSensVals(dataDict, logFile):
 
 	return testPassed
 
-# Ankle Encoder Check - Verfiy ankle encoder is functioning nominally
 def eb60AnkCheck(devId, appType, logFile):
+	"""
+	Ankle Encoder Check - Verfiy ankle encoder is functioning nominally.
+	This is done using the follow process:
+	  - Operator rotates magnet over Habs
+	  - Data is recorded during this operation
+	  - Data is analyzed to verify nominal function
+	"""
 	logFile.write(f'Ankle angle check start')
 	[time, time_step] = [5, 0.1]
 
 	print(f'\n>>> User Input: Move ankle through its full range of travel for {time} seconds\n')
 	sleep(3)
 	print('Measuring Ankle Position...')
-	dataDict = recordData(devId, appType, time, time_step, showMsg=True, msgFreq=5)
+	dataDict = fxu.recordData(devId, appType, time, time_step, showMsg=True, msgFreq=5)
 
 	if checkAnkVals(dataDict, logFile):
 		print("\nAnkle Angle Check Passed")
@@ -118,21 +131,21 @@ def eb60AnkCheck(devId, appType, logFile):
 		logFile.write(f'Ankle angle check end')
 		return True
 	else:
-		print("\nTest Failed: Ankle Angle Check Failed")
 		logFile.write('Ankle Angle Check Failed')
 		logFile.write(f'Ankle angle check end')
 		return False		
 
 def checkAnkVals(dataDict, logFile):
-	# Check that sensors min and max are in range
+	"""
+	Check that measured min and max are in expected range
+	"""
 	testPassed = True
 
-	sensors = ['ank_ang']
 	sensorRange = {
 		'ank_ang': {'min_lo': 1990, 'min_hi': 2100, 'max_lo': 6150, 'max_hi': 6400},
 		}
 
-	for sensor in sensors:
+	for sensor in sensorRange:
 		sensorMin = min(dataDict[sensor])
 		sensorMax = max(dataDict[sensor])
 		logFile.write(f"sensor = {sensor}, measured minimum = {str(sensorMin)}, acceptable range = {str(sensorRange[sensor]['min_lo'])} to {str(sensorRange[sensor]['min_hi'])}")
@@ -151,12 +164,15 @@ def checkAnkVals(dataDict, logFile):
 	return testPassed
 
 def eb60FindPoles(devId, logFile):
+	"""
+	Run fxFindPoles and wait for completion
+	"""
 	print("\nFinding Poles...")
 	logFile.write(f'Find poles start')
 	time = 60.0
 	time_step = 10.0
 	
-	fxFindPoles(devId)
+	fxp.fxFindPoles(devId)
 	for i in range(int(time / time_step)):
 		print(f"{int(time - i * time_step)} seconds remaining")
 		sleep(time_step)
@@ -165,6 +181,13 @@ def eb60FindPoles(devId, logFile):
 	return True
 
 def eb60NoLoadAct(devId, appType, logFile):
+	"""
+	Spin the motor and make sure it behaves nominally
+	Tests include:
+	  - no load ramp up - records voltage at which the motor overcomes static friction
+	  - no load speed - measures the no load speed of the motor
+	  - ramp down - safely stops the motor from spinning
+	"""
 	print("\nRunning No Load Test...")
 	logFile.write(f'No load test start')
 	# Test parameters
@@ -176,7 +199,7 @@ def eb60NoLoadAct(devId, appType, logFile):
 
 	testPassed = True
 	sleep(2)
-	fxSendMotorCommand(devId, FxVoltage, 0)
+	fxp.fxSendMotorCommand(devId, fxp.FxVoltage, 0)
 	try:
 		# Ramp motor up and measure voltage to overcome friction
 		mVcog = noLoadRampUp(devId, appType, rampUpTime, rampUpTimeStep, mVmax)
@@ -208,68 +231,77 @@ def eb60NoLoadAct(devId, appType, logFile):
 
 	except Exception as e:
 		# Set motor voltage to 0 if error occurs
-		fxSendMotorCommand(devId, FxVoltage, 0)
-		text = "Error: problem in no load test - " + str(e)
+		fxp.fxSendMotorCommand(devId, fxp.FxVoltage, 0)
+		text = "Error: problem in no load test - {}".format(e)
 		print('\n' + text)
 		logFile.write(text)
 		testPassed = False
 		return testPassed
 
 def noLoadRampUp(devId, appType, time, time_step, mVmax):
-		# Measure cogging voltage
-		mV = 0
-		mot_vel = 0
-		dataDict = getData(devId, appType)
+	"""
+	Slowly increase motor voltage and record when the motor starts spinning
+	"""
+	mV = 0
+	mot_vel = 0
+	dataDict = fxu.getData(devId, appType)
+	mot_ang = dataDict['mot_ang']
+	last_mot_ang = mot_ang
+	[cogFlag, mVcog] = [True, -1]
+
+	# Ramp up
+	for i in range(int(time / time_step)):
+		if (i * time_step) % 3 == 0:
+			print(f"{int(time - i * time_step)} seconds remaining in ramp up")
+		dataDict = fxu.getData(devId, appType)
 		mot_ang = dataDict['mot_ang']
+		mot_vel = (mot_ang - last_mot_ang)/time_step
+		sleep(time_step)
+		mV = int(mVmax * ((i + 1) * time_step/time))
+		fxp.fxSendMotorCommand(devId, fxp.FxVoltage, mV)
+		if mot_vel > 1000 and cogFlag:
+			cogFlag = False
+			mVcog = mV
 		last_mot_ang = mot_ang
-		[cogFlag, mVcog] = [True, -1]
+	print("0 seconds remaining in ramp up")
 
-		# Ramp up
-		for i in range(int(time / time_step)):
-			if (i * time_step) % 3 == 0:
-				print(f"{int(time - i * time_step)} seconds remaining in ramp up")
-			dataDict = getData(devId, appType)
-			mot_ang = dataDict['mot_ang']
-			mot_vel = (mot_ang - last_mot_ang)/time_step
-			sleep(time_step)
-			mV = int(mVmax * ((i + 1) * time_step/time))
-			fxSendMotorCommand(devId, FxVoltage, mV)
-			if mot_vel > 1000 and cogFlag:
-				cogFlag = False
-				mVcog = mV
-			last_mot_ang = mot_ang
-		print("0 seconds remaining in ramp up")
-
-		return mVcog
+	return mVcog
 
 def measureNoLoadSpeed(devId, appType, time, time_step, mV):
-	# Let motor reach steady state and measure speed
+	"""
+	Let the motor spin at a constant voltage and measure speed
+	"""
 	print("\nMeasuring no load speed...")
-	fxSendMotorCommand(devId, FxVoltage, mV)
+	fxp.fxSendMotorCommand(devId, fxp.FxVoltage, mV)
+	# Let motor reach steady state and measure speed
 	sleep(1)
-	dataDict = recordData(devId, appType, time=5, time_step=0.1, showMsg=True, msgFreq=3)
-	motVelList = []
+	dataDict = fxu.recordData(devId, appType, time=5, time_step=0.1, showMsg=True, msgFreq=3)
+	motVelList = list()
 	for i in range(1, len(dataDict['mot_ang'])):
 		motVelList.append(dataDict['mot_ang'][i] - dataDict['mot_ang'][i-1])
 	noLoadVel = mean(motVelList)
 	return noLoadVel
 
 def noLoadRampDown(devId, appType, time, time_step, mV_start):
-		# Ramp down
-		mV = mV_start
-		for i in range(int(time / time_step)):
-			sleep(time_step)
-			mV = int(mV - mV_start / (time / time_step))
-			fxSendMotorCommand(devId, FxVoltage, mV)
-		fxSendMotorCommand(devId, FxVoltage, 0)
+	"""
+	Ramp the motor speed down
+	"""
+	mV = mV_start
+	for i in range(int(time / time_step)):
+		sleep(time_step)
+		mV = int(mV - mV_start / (time / time_step))
+		fxp.fxSendMotorCommand(devId, fxp.FxVoltage, mV)
+	fxp.fxSendMotorCommand(devId, fxp.FxVoltage, 0)
 
 
-
-if __name__ == '__main__':
+def main():
 	baudRate = sys.argv[1]
 	ports = sys.argv[2:3]
 	try:
-		fxOpenControl(baudRate)
+		fxp.fxOpenControl(baudRate)
 	except Exception as e:
 		print("Broke... ")
-		print(str(e))
+		print(str(e))	
+
+if __name__ == '__main__':
+	main()
