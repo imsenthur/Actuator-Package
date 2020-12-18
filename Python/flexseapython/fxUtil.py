@@ -2,7 +2,6 @@ from .pyFlexsea import *
 from time import sleep
 import numpy as np
 import os
-import datetime
 
 from .dev_spec import AllDevices
 
@@ -149,10 +148,10 @@ def formatData(exoState: AllDevices.ExoState):
 # Record data and return a dictionary of values
 def recordData(devId, appType, time, time_step, showMsg=False, msgFreq=1):
 	# Build dataDict for sensor data
-	dataDict = {}
+	dataDict = dict()
 	data = getData(devId, appType)
 	for d in data:
-		dataDict[d] = []
+		dataDict[d] = list()
 
 	# Record data for time
 	totalLoopCount = int(time / time_step)
@@ -167,43 +166,6 @@ def recordData(devId, appType, time, time_step, showMsg=False, msgFreq=1):
 			dataDict[d].append(data[d])
 
 	return dataDict
-
-# Class used to log test data
-class TestLogFile:
-	def __init__(self, testname):
-		print('\n>>>Input device serial number:')
-		sn = input() 
-		print('>>>Enter your initials:')
-		operator = input()
-		now = datetime.datetime.now()
-		date = now.strftime("%Y%m%d")
-		time = now.strftime("%H%M%S")
-		nowstr = date + "_" + time
-
-		curDir = os.getcwd()
-		self.logDir = os.getcwd() + '/TestLog'
-		if not os.path.exists(self.logDir):
-			os.makedirs(self.logDir)
-		os.chdir(self.logDir)
-
-		self.filename = nowstr + "_SN" + sn + "_" + testname
-		f = open(self.filename, "a")
-		f.write(f"Test: {testname}")
-		f.write(f"\nSN: {sn}")
-		f.write(f"\nDate: {date}")
-		f.write(f"\nStart Time: {time}")
-		f.write(f"\nOperator: {operator}")
-		f.close()
-		os.chdir(curDir)
-
-	def write(self, text):
-		curDir = os.getcwd()
-		os.chdir(self.logDir)
-		f = open(self.filename, "a")
-		f.write(f"\n{datetime.datetime.now()}: ")
-		f.write(text)
-		f.close
-		os.chdir(curDir)
 
 # Most scripts will print a loop count:
 def printLoopCount(i, total):
