@@ -191,42 +191,49 @@ def eb60NoLoadAct(devId, appType, logFile):
 	print("\nRunning No Load Test...")
 	logFile.write(f'No load test start')
 	# Test parameters
-	[rampUpTime, rampUpTimeStep, mVmax] = [30, 0.1, 2000]
+	mVmax = 2000
+	[rampUpTime, rampUpTimeStep] = [10, 0.1]
 	[noLoadTime, noLoadTimeStep] = [5, 0.1]
-	[rampDownTime, rampDownTimeStep] = [2, .01]
+	[rampDownTime, rampDownTimeStep] = [10, .1]
 	# Pass criteria
-	[mVcogLim, noLoadVelLim] = [766, 3700]
+	[mVfrictLim, noLoadVelLim] = [766, 3700]
 
 	testPassed = True
 	sleep(2)
 	fxp.fxSendMotorCommand(devId, fxp.FxVoltage, 0)
 	try:
-		# Ramp motor up and measure voltage to overcome friction
-		mVcog = noLoadRampUp(devId, appType, rampUpTime, rampUpTimeStep, mVmax)
-		# Let motor reach steady state and measure speed
-		noLoadVel = measureNoLoadSpeed(devId, appType, noLoadTime, noLoadTimeStep, mVmax)
-		noLoadRampDown(devId, appType, rampDownTime, rampDownTimeStep, mVmax)
+		directions = [1, -1]
+		for direction in directions:
+			mVmaxLocal = mVmax * direction
+			# Ramp motor up and measure voltage to overcome friction
+			rampUpResult = noLoadRamp(devId, appType, 0, mVmaxLocal, rampUpTime, rampUpTimeStep, measMotStart=True)
+			# Let motor reach steady state and measure speed
+			noLoadVel = measureNoLoadSpeed(devId, appType, noLoadTime, noLoadTimeStep, mVmaxLocal)
+			# Ramp motor down and measure speed
+			rampDownResult = noLoadRamp(devId, appType, mVmaxLocal, 0, rampDownTime, rampDownTimeStep, measMotStop=True)
 
-		text = f"Motor cogging voltage: {int(mVcog)} mv    Acceptance criteria < {mVcogLim}"
-		print('\n' + text)
-		logFile.write(text)
-		text = f"Motor no load speed at {mVmax} mv: {int(noLoadVel)}    Acceptance criteria > {noLoadVelLim}"
-		print(text)
-		logFile.write(text)
-
-		# Check if test passed
-		if mVcog > mVcogLim:
-			text = f"No Load Test Failed. Measured cogging voltage was {int(mVcog)}, it should be be {mVcogLim}"
+			text = f"Motor starting voltage: {rampUpResult['motStartmV']} mv    Acceptance criteria < {mVfrictLim}"
 			print('\n' + text)
 			logFile.write(text)
-			testPassed = False
-		if noLoadVel < noLoadVelLim:
-			text = f"No Load Test Failed. Measured no load velocity was {int(noLoadVel)}, it should be above {noLoadVelLim}"
-			print('\n' + text)
+			text = f"Motor no load speed at {mVmaxLocal} mv: {int(noLoadVel)}    Acceptance criteria > {noLoadVelLim}"
+			print(text)
 			logFile.write(text)
-			testPassed = False
+			text = f"Motor stop voltage: {rampDownResult['motStopmV']} mv"
+			print(text)
+			logFile.write(text)
+			# Check if test passed
+			if rampUpResult['motStartmV'] > mVfrictLim:
+				text = f"No Load Test Failed. Measured starting voltage was {rampUpResult['motStartmV']}, it should be be {mVfrictLim}"
+				print('\n' + text)
+				logFile.write(text)
+				testPassed = False
+			if abs(noLoadVel) < noLoadVelLim:
+				text = f"No Load Test Failed. Measured no load velocity was {int(noLoadVel)}, it should be above {noLoadVelLim}"
+				print('\n' + text)
+				logFile.write(text)
+				testPassed = False
 
-		logFile.write(f'No load test end')
+		logFile.write('No load test end')
 		return testPassed
 
 	except Exception as e:
@@ -238,34 +245,54 @@ def eb60NoLoadAct(devId, appType, logFile):
 		testPassed = False
 		return testPassed
 
-def noLoadRampUp(devId, appType, time, time_step, mVmax):
+def noLoadRamp(devId, appType, mVstart, mVstop, rampTime, timeStep, measMotStart=False, measMotStop=False):
 	"""
-	Slowly increase motor voltage and record when the motor starts spinning
+	Ramp the motor voltage from mVstart to mVstop.
+	measMotStart allows you to measure at what mV the motor starts turning
+	measMotStop allows you to measure at what mV the motor stops turning
 	"""
-	mV = 0
-	mot_vel = 0
+	print('\nRamping Motor Voltage...')
+	[motStartSpeed, motStopSpeed] = [1000, 1000]
+	[motStartFlag, motStopFlag] = [0, 0]
+	motmVdict = {'motStartmV': None, 'motStopmV': None}
+
+
+	steps = rampTime/timeStep
+	mVstep = (mVstop - mVstart)/steps
+
 	dataDict = fxu.getData(devId, appType)
 	mot_ang = dataDict['mot_ang']
 	last_mot_ang = mot_ang
-	[cogFlag, mVcog] = [True, -1]
+	idx = 0
 
-	# Ramp up
-	for i in range(int(time / time_step)):
-		if (i * time_step) % 3 == 0:
-			print(f"{int(time - i * time_step)} seconds remaining in ramp up")
+	for mV in range(int(mVstart), int(mVstop), int(mVstep)):
+		fxp.fxSendMotorCommand(devId, fxp.FxVoltage, mV)
+		sleep(timeStep)
 		dataDict = fxu.getData(devId, appType)
 		mot_ang = dataDict['mot_ang']
-		mot_vel = (mot_ang - last_mot_ang)/time_step
-		sleep(time_step)
-		mV = int(mVmax * ((i + 1) * time_step/time))
-		fxp.fxSendMotorCommand(devId, fxp.FxVoltage, mV)
-		if mot_vel > 1000 and cogFlag:
-			cogFlag = False
-			mVcog = mV
+		mot_vel = (mot_ang - last_mot_ang)/timeStep
 		last_mot_ang = mot_ang
-	print("0 seconds remaining in ramp up")
+		
+		if measMotStart and abs(mot_vel) > motStartSpeed and not motStartFlag:
+			motmVdict['motStartmV'] = mV
+			motStartFlag = 1
 
-	return mVcog
+		if measMotStop and abs(mot_vel) < motStopSpeed and not motStopFlag:
+			motmVdict['motStopmV'] = mV
+			motStopFlag = 1
+
+		# Update user
+		if idx % 10 == 0:
+			print(f'Curent Voltage: {mV} mV, Stop Voltage: {mVstop} mV')
+		idx += 1
+
+	print(f'Curent Voltage: {mV} mV, Stop Voltage: {mVstop} mV')
+	fxp.fxSendMotorCommand(devId, fxp.FxVoltage, mVstop)
+
+	return motmVdict
+
+
+
 
 def measureNoLoadSpeed(devId, appType, time, time_step, mV):
 	"""
