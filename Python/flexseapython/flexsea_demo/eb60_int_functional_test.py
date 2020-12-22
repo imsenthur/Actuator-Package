@@ -206,11 +206,11 @@ def eb60NoLoadAct(devId, appType, logFile):
 		for direction in directions:
 			mVmaxLocal = mVmax * direction
 			# Ramp motor up and measure voltage to overcome friction
-			rampUpResult = noLoadRamp(devId, appType, 0, mVmaxLocal, rampUpTime, rampUpTimeStep, measMotStart=True)
+			rampUpResult = noLoadRamp(devId, appType, 0, mVmaxLocal, rampUpTime, rampUpTimeStep, logFile=logFile, measMotStart=True)
 			# Let motor reach steady state and measure speed
 			noLoadVel = measureNoLoadSpeed(devId, appType, noLoadTime, noLoadTimeStep, mVmaxLocal)
 			# Ramp motor down and measure speed
-			rampDownResult = noLoadRamp(devId, appType, mVmaxLocal, 0, rampDownTime, rampDownTimeStep, measMotStop=True)
+			rampDownResult = noLoadRamp(devId, appType, mVmaxLocal, 0, rampDownTime, rampDownTimeStep, logFile=logFile, measMotStop=True)
 
 			text = f"Motor starting voltage: {rampUpResult['motStartmV']} mv    Acceptance criteria < {mVfrictLim}"
 			print('\n' + text)
@@ -245,13 +245,15 @@ def eb60NoLoadAct(devId, appType, logFile):
 		testPassed = False
 		return testPassed
 
-def noLoadRamp(devId, appType, mVstart, mVstop, rampTime, timeStep, measMotStart=False, measMotStop=False):
+def noLoadRamp(devId, appType, mVstart, mVstop, rampTime, timeStep, logFile=False, measMotStart=False, measMotStop=False):
 	"""
 	Ramp the motor voltage from mVstart to mVstop.
 	measMotStart allows you to measure at what mV the motor starts turning
 	measMotStop allows you to measure at what mV the motor stops turning
 	"""
-	print('\nRamping Motor Voltage...')
+	print(f'\nRamping Motor Voltage from {mVstart} mV to {mVstop} mV...')
+	if logFile:
+		logFile.write(f'Motor Voltage ramp - starting voltage = {mVstart} mV, stopping voltage = {mVstop} mV, ramp time = {rampTime} s, time step = {timeStep} s')
 	[motStartSpeed, motStopSpeed] = [1000, 1000]
 	[motStartFlag, motStopFlag] = [0, 0]
 	motmVdict = {'motStartmV': None, 'motStopmV': None}
@@ -290,9 +292,6 @@ def noLoadRamp(devId, appType, mVstart, mVstop, rampTime, timeStep, measMotStart
 	fxp.fxSendMotorCommand(devId, fxp.FxVoltage, mVstop)
 
 	return motmVdict
-
-
-
 
 def measureNoLoadSpeed(devId, appType, time, time_step, mV):
 	"""
