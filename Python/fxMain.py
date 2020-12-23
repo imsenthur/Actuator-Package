@@ -27,6 +27,7 @@ from flexseapython.flexsea_demo.impedancecontrol import fxImpedanceControl
 from flexseapython.flexsea_demo.two_devices_leaderfollower import fxLeaderFollower
 from flexseapython.flexsea_demo.twopositioncontrol import fxTwoPositionControl
 from flexseapython.flexsea_demo.eb60_int_functional_test import fxEB60IntFunctTest
+from flexseapython.flexsea_demo.eb60_final_functional_test import fxEB60FinalFunctTest
 
 def sig_handler(frame, signal_received):
 	return sys.exit('\nCTRL-C or SIGINT detected\nExiting ...')
@@ -52,6 +53,7 @@ experiments = [
 	(fxTwoDevicePositionControl,	"Two Devices Position Control",			2),
 	(fxLeaderFollower,				"Two Devices Leader Follower Control",	2),
 	(fxEB60IntFunctTest, 			"EB60 Intermediate Functional Test",	1),
+	(fxEB60FinalFunctTest, 			"EB60 Final Functional Test",	1)
 ]
 
 MAX_EXPERIMENT			= len(experiments) - 1
