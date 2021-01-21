@@ -3,6 +3,7 @@ from scipy.signal import chirp, sweep_poly
 import matplotlib.pyplot as pyplt
 import time
 import flexseapython.pyFlexsea as fxp
+import flexseapython.fxUtil as fxu
 
 
 class GenSineSweep:
@@ -45,7 +46,7 @@ def make_plot(time, val, x_label=False, y_label=False, legend=False):
 	pyplt.draw()
 
 
-def run_position_profile(devId, profile):
+def run_position_profile(devId, appType, profile):
 	"""
 	This function takes a profile object and commands the actpack to execute the profile.
 	"""
@@ -57,7 +58,7 @@ def run_position_profile(devId, profile):
 
 	try:
 		[elapsed_time, last_time] = [0.0, 0.0]
-		[set_time, set_m_voltage] = [[], []]
+		[set_time, set_m_voltage, motor_position] = [[], [], []]
 		text = ""
 		while elapsed_time < run_time:
 			elapsed_time = time.time() - start_time
@@ -69,6 +70,9 @@ def run_position_profile(devId, profile):
 
 			set_time.append(time_list[0])
 			set_m_voltage.append(m_voltage_list[0])
+
+			data = fxu.getData(devId, appType)
+			motor_position.append(data['mot_ang'])
 
 			fxp.fxSendMotorCommand(devId, fxp.FxVoltage, m_voltage_list[0])
 
@@ -82,7 +86,9 @@ def run_position_profile(devId, profile):
 			last_time = elapsed_time
 
 		print(text)
-		return [set_time, set_m_voltage]
+		return [set_time, motor_position]
+		#return [set_time, set_m_voltage]
+
 
 
 	except Exception as e:
@@ -95,12 +101,12 @@ def run_position_profile(devId, profile):
 		return None
 
 
-def main(devId):
+def main(devId, appType):
 	"""
 	Do stuff here
 	"""
 	profile = GenSineSweep(start_freq=0.01, end_freq=5, amplitude=3000, run_time=20, time_step=0.001, offset=0) 
-	data = run_position_profile(devId, profile)
+	data = run_position_profile(devId, appType, profile)
 	fxp.fxSendMotorCommand(devId, fxp.FxVoltage, 0)
 	make_plot(data[0], data[1], x_label='time (s)', y_label='Voltage (mV)')
 	pyplt.show()
@@ -108,6 +114,6 @@ def main(devId):
 
 
 if __name__ == '__main__':
-	main(devId)
+	main(devId, appType)
 
 
