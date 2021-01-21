@@ -150,16 +150,16 @@ def recordData(devId, appType, time, time_step, showMsg=False, msgFreq=1):
 	# Build dataDict for sensor data
 	dataDict = dict()
 	data = getData(devId, appType)
-	for d in data:
-		dataDict[d] = list()
+	for data_point in data:
+		dataDict[data_point] = list()
 
 	# Record data for time
 	totalLoopCount = int(time / time_step)
-	for i in range(totalLoopCount):
-		if showMsg and (i % msgFreq) == 0:
-			print(f'Measurement {i+1} of {totalLoopCount}')
-		elif showMsg and i == totalLoopCount - 1:
-			print(f'Measurement {i+1} of {totalLoopCount}')
+	for idx in range(totalLoopCount):
+		if showMsg and (idx % msgFreq) == 0:
+			print(f'Measurement {idx+1} of {totalLoopCount}')
+		elif showMsg and idx == totalLoopCount - 1:
+			print(f'Measurement {idx+1} of {totalLoopCount}')
 		sleep(time_step)
 		data = getData(devId, appType)
 		for d in data:
