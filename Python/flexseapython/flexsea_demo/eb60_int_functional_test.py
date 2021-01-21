@@ -91,7 +91,7 @@ def checkSensVals(dataDict, logFile):
 		'gyroz': {'min': -15000, 'max': 15000},
 		#'batt_volt': {'min': 180, 'max': 225},		# USB Voltage
 		'batt_volt': {'min': 38000, 'max': 39000},	# Power Supply Voltage
-		'batt_curr': {'min': -130, 'max': 231},
+		'batt_curr': {'min': -130, 'max': 300},
 		'temperature': {'min': 10, 'max': 60}
 		#'ank_ang': {'min': 2000, 'max': 6300},
 		#'ank_vel': {'min': -500, 'max': 500}
