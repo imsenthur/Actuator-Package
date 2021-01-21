@@ -24,7 +24,7 @@ def fxEB60FinalFunctTest(port, baudRate):
 
 	# Run tests
 	try:
-		assert ebu.main(devId), 'Bummer...'
+		assert ebu.main(devId, appType), 'Bummer...'
 
 	except AssertionError as err:
 		print('Test Failed: {}'.format(err))
