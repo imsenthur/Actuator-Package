@@ -11,7 +11,7 @@ sys.path.append(PARDIR)
 
 def fxEB60FinalFunctTest(port, baudRate):
 	"""
-	Runs intermediate functional test designed for EB60
+	Runs Final functional test designed for EB60
 	"""
 	# Setup Device
 	devId = fxp.fxOpen(port, baudRate, logLevel = 6)
@@ -20,11 +20,14 @@ def fxEB60FinalFunctTest(port, baudRate):
 
 	print("\nStarting Intermediate Functional Test...")
 
-	#logFile = tlf.TestLogFile('EB60_Final_Functional_Test')
+	logFile = tlf.TestLogFile('EB60_Final_Functional_Test')
 
 	# Run tests
 	try:
-		assert ebu.main(devId, appType), 'Bummer...'
+		#assert ebu.main(devId, appType), 'Bummer...'
+		assert ebu.eb60SensorCheck(devId, appType, logFile), 'Sensor Check Failed'
+		assert eb60ActuationCheck(devId, appType, logFile), 'Actuation Check Failed'
+		assert eb60SineSweep(devId, appType, logFile), 'Sine Sweep Failed'
 
 	except AssertionError as err:
 		print('Test Failed: {}'.format(err))
@@ -35,6 +38,12 @@ def fxEB60FinalFunctTest(port, baudRate):
 
 ##########################################################################
 # Test Functions
+def eb60ActuationCheck(devId, appType, logFile):
+	pass
+
+def eb60SineSweep(devId, appType, logFile):
+	pass
+
 
 
 
