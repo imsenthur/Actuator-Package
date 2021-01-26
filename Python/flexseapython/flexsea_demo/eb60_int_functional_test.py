@@ -2,6 +2,7 @@ import os, sys
 from time import sleep
 import flexseapython.fxUtil as fxu
 import flexseapython.pyFlexsea as fxp
+import flexseapython.eb60_test_util as ebu
 import testLogFile as tlf
 from numpy import mean
 
@@ -23,7 +24,7 @@ def fxEB60IntFunctTest(port, baudRate):
 
 	# Run tests
 	try:
-		assert eb60SensorCheck(devId, appType, logFile), 'Sensor Check Failed'
+		assert ebu.eb60SensorCheck(devId, appType, logFile), 'Sensor Check Failed'
 		assert eb60AnkCheck(devId, appType, logFile), 'Ankle Check Failed'
 		assert eb60FindPoles(devId, logFile), 'Find Poles Failed'
 		# Close the reopen device after finding poles
@@ -42,73 +43,6 @@ def fxEB60IntFunctTest(port, baudRate):
 
 ##########################################################################
 # Test Functions
-
-def eb60SensorCheck(devId, appType, logFile):
-	"""
-	Sensor Check - Verify all sensors are functioning nominally
-	"""
-	print("\nChecking Sensors...")
-	logFile.write(f'Sensor check start')
-	[time, time_step] = [2, 0.1]
-
-	dataDict = fxu.recordData(devId, appType, time, time_step, showMsg=True)
-
-	if checkSensVals(dataDict, logFile):
-		print("\nSensor Check Passed")
-		logFile.write(f'Sensor check end')
-		logFile.write('Sensor Check Passed')
-		return True
-	else:
-		logFile.write(f'Sensor check end')
-		logFile.write('Sensor Check Failed')
-		return False
-
-def checkSensVals(dataDict, logFile):
-	"""
-	Verify that measured sensor values match expect values.
-	Checks include:
-	  - signals are non zero
-	  - signals are in expected range
-	 """
-	testPassed = True
-	# Check sensor are non zero
-	sensors = ['accelx', 'accely', 'accelz', 'gyrox', 'gyroy', 'gyroz', 
-				'mot_ang', 'mot_cur', 'batt_volt', 'batt_curr']
-	for sensor in sensors:
-		sensorMean = mean(dataDict[sensor])
-		logFile.write(f'sensor = {sensor}, measured mean = {str(sensorMean)}, Acceptance criteria - not == 0.0')
-		if sensorMean == 0.0:
-			print(f'Sensor Check Failed: {sensor} is 0.0')
-			testPassed = False
-
-	# Check sensors are in range
-	sensorRange = {
-		'accelx': {'min': -25000, 'max': 25000},
-		'accely': {'min': -25000, 'max': 25000},
-		'accelz': {'min' :-25000, 'max': 25000},
-		'gyrox': {'min': -15000, 'max': 15000},
-		'gyroy': {'min': -15000, 'max': 15000},
-		'gyroz': {'min': -15000, 'max': 15000},
-		#'batt_volt': {'min': 180, 'max': 225},		# USB Voltage
-		'batt_volt': {'min': 38000, 'max': 39000},	# Power Supply Voltage
-		'batt_curr': {'min': -130, 'max': 300},
-		'temperature': {'min': 10, 'max': 60}
-		#'ank_ang': {'min': 2000, 'max': 6300},
-		#'ank_vel': {'min': -500, 'max': 500}
-		}
-	for sensor in sensorRange:
-		sensorMin = min(dataDict[sensor])
-		sensorMax = max(dataDict[sensor])
-		logFile.write(f"sensor = {sensor}, measured [minimum, maximum] = [{str(sensorMin)}, {str(sensorMax)}], limit [minimum, maximum] = [{str(sensorRange[sensor]['min'])}, {str(sensorRange[sensor]['max'])}]")
-		if sensorMin < sensorRange[sensor]['min']:
-			print(f"\nSensor Check Failed: {sensor} minimum is {sensorMin} (it should be above {sensorRange[sensor]['min']})")
-			testPassed = False
-		if sensorMax > sensorRange[sensor]['max']:
-			print(f"\nSensor Check Failed: {sensor} maximum is {sensorMax} (it should be below {sensorRange[sensor]['max']})")
-			testPassed = False	
-
-	return testPassed
-
 def eb60AnkCheck(devId, appType, logFile):
 	"""
 	Ankle Encoder Check - Verfiy ankle encoder is functioning nominally.
@@ -256,7 +190,7 @@ def noLoadRamp(devId, appType, mVstart, mVstop, rampTime, timeStep, logFile=Fals
 		logFile.write(f'Motor Voltage ramp - starting voltage = {mVstart} mV, stopping voltage = {mVstop} mV, ramp time = {rampTime} s, time step = {timeStep} s')
 	[motStartSpeed, motStopSpeed] = [1000, 1000]
 	[motStartFlag, motStopFlag] = [0, 0]
-	motmVdict = {'motStartmV': None, 'motStopmV': None}
+	motmVdict = {'motStartmV': float('inf'), 'motStopmV': 0}
 
 
 	steps = rampTime/timeStep
