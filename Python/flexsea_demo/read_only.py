@@ -20,7 +20,7 @@ def print_bms_state(fxs, dev_id):
 		print("Temperature [{}]: {}".format(i, bms_state.temperature[i]))
 
 
-def read_only(fxs, port, baud_rate, run_time=8, time_step=0.1):
+def read_only(fxs, port, baud_rate, run_time=8, user_input=True, time_step=0.1 ):
 	"""
 	Reads FlexSEA device and prints gathered data.
 	"""
@@ -32,16 +32,16 @@ def read_only(fxs, port, baud_rate, run_time=8, time_step=0.1):
 
 	if app_type.value == fxe.FX_ACT_PACK.value:
 		print("\nYour device is an ActPack.\n")
-		input("Press Enter to continue...")
-	elif app_type.value == fxe.FX_NET_MASTER.value:
+		if user_input:input("Press Enter to continue...")
+	elif app_type.value == fxe.FX_NET_MASTER.value and user_input:
 		print("\nYour device is a NetMaster.\n")
-		input("Press Enter to continue...")
-	elif app_type.value == fxe.FX_BMS.value:
+		if user_input:input("Press Enter to continue...")
+	elif app_type.value == fxe.FX_BMS.value and user_input:
 		print("\nYour device is a BMS.\n")
-		input("Press Enter to continue...")
-	elif app_type.value == fxe.FX_EB5X.value:
+		if user_input:input("Press Enter to continue...")
+	elif app_type.value == fxe.FX_EB5X.value and user_input:
 		print("\nYour device is an Exo or ActPack Plus.\n")
-		input("Press Enter to continue...")
+		if user_input:input("Press Enter to continue...")
 	else:
 		raise RuntimeError(f"Unsupported application type: {app_type}")
 
@@ -76,8 +76,25 @@ def main():
 		default=230400,
 		help="Serial communication baud rate.",
 	)
+	parser.add_argument(
+		"-rt",
+		"--run_t",
+		nargs=1,
+		metavar="R",
+		dest="run_time",
+		type=int,
+		default=[8],
+		help="Total run time in seconds.",
+	)
+	parser.add_argument(
+		"-UI",
+		"--no_user_input",
+		dest="no_user_input",
+		action='store_false',
+		help="Do not wait for user input.",
+	)
 	args = parser.parse_args()
-	read_only(flex.FlexSEA(), args.port[0], args.baud_rate)
+	read_only(flex.FlexSEA(), args.port[0], args.baud_rate, args.run_time[0], args.no_user_input)
 
 
 if __name__ == "__main__":
