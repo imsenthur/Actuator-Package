@@ -20,10 +20,11 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
 	echo -e "${RED}An issue was encountered when installing the python dependencies.${NC}" &&
 	exit 1
 	
-# Raspberry Pi Dependencies
+# Raspberry Pi Dependencies (ARM)
 elif [[ "$OSTYPE" == "linux-gnueabihf" ]]; then
+	# Raspbian Bullseye
 	if cat /etc/os-release | grep "bullseye"; then
-		# Skipping Python 3.9.0 installation, since Bullseye is bundled with Python 3.9.2
+		# Skipping Python 3.9.0 installation since bullseye is bundled with Python 3.9.2
 		sudo apt-get update &&
 		sudo apt-get install ufw python3-scipy libatlas-base-dev -y &&
 		sudo ufw --force enable && sudo ufw allow 8988 && sudo ufw allow 22 && # Open port for graph display
@@ -32,7 +33,8 @@ elif [[ "$OSTYPE" == "linux-gnueabihf" ]]; then
 		exit 0 ||
 		echo -e "${RED}An issue was encountered when installing the python dependencies.${NC}" &&
 		exit 1
-		
+
+	# Raspbian Buster/Jessie
 	else
 		sudo apt-get update &&
 		sudo apt-get update
